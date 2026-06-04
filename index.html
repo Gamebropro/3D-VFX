@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UE5 Viewport Client - WebGPU Engine</title>
+  <!-- Google Fonts for Premium Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles.css" />
+  <script type="module" src="/src/main.ts" defer></script>
+</head>
+
+<body>
+  <!-- Full-screen WebGL/WebGPU Viewport -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Center Viewport Crosshair/Grid Helper -->
+  <div class="viewport-hud">
+    <div class="viewport-crosshair"></div>
+    <div class="viewport-mode-indicator">PERSPECTIVE</div>
+  </div>
+
+  <!-- Drag & Drop Overlay Zone -->
+  <div id="drop-zone-overlay" class="drop-zone-overlay">
+    <div class="drop-message-box">
+      <span class="drop-icon">📥</span>
+      <h2>Drop 3D Model Here</h2>
+      <p>Supports .glb and .gltf files</p>
+    </div>
+  </div>
+
+  <!-- Main Editor Interface -->
+  <div class="app-container">
+
+    <!-- Left Panel: Outliner & Details (UE5 style) -->
+    <aside class="sidebar glass-panel">
+      <header class="sidebar-header">
+        <div class="logo-area">
+          <span class="unreal-icon">u</span>
+          <div class="title-sub">
+            <h2>UNREAL CLIENT</h2>
+            <span class="badge" id="api-badge">WebGPU Mode</span>
+          </div>
+        </div>
+        <p class="subtitle">Next-Gen Real-time Viewport Engine</p>
+      </header>
+
+      <hr class="separator" />
+
+      <!-- Engine Renderer Configuration -->
+      <section class="section-group">
+        <h3>Viewport Settings</h3>
+        <div class="control-group">
+          <label for="api-select">Graphics API</label>
+          <div class="select-wrapper">
+            <select id="api-select" class="custom-select">
+              <option value="webgpu">WebGPU (Experimental)</option>
+              <option value="webgl2">WebGL 2 (Standard)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3D Model Import Controls -->
+      <section class="section-group">
+        <h3>Asset Importer</h3>
+        <div class="import-card">
+          <input type="file" id="file-input" accept=".gltf,.glb" style="display: none;" />
+          <button id="btn-import" class="btn-import">
+            <span class="btn-icon">📁</span> Select 3D Model (.glb / .gltf)
+          </button>
+          <p class="import-tip">Or drag & drop file anywhere in viewport</p>
+
+          <!-- Dynamic loading indicator -->
+          <div id="progress-container" class="progress-container hidden">
+            <div class="progress-header">
+              <span class="progress-title">Importing Mesh...</span>
+              <span id="progress-text" class="progress-pct">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progress-bar" class="progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Day/Night System -->
+      <section class="section-group">
+        <h3>Day / Night System</h3>
+
+        <div class="control-group">
+          <div class="control-header">
+            <label for="slider-time-of-day">Time of Day</label>
+            <span class="value-display" id="val-time-of-day">12:00</span>
+          </div>
+          <input type="range" id="slider-time-of-day" min="0" max="24" step="0.05" value="12"
+            class="custom-slider slider-time" />
+          <div class="time-icons">
+            <span>🌙</span><span>🌅</span><span>☀️</span><span>🌇</span><span>🌙</span>
+          </div>
+        </div>
+
+        <div class="day-night-presets">
+          <button class="btn-preset" data-time="5.5">Dawn</button>
+          <button class="btn-preset active" data-time="12">Noon</button>
+          <button class="btn-preset" data-time="17.5">Dusk</button>
+          <button class="btn-preset" data-time="0">Night</button>
+        </div>
+
+        <div class="control-group">
+          <div class="control-header">
+            <label for="toggle-daynight-cycle">Auto Cycle</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-daynight-cycle" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="control-group" id="cycle-speed-group">
+          <div class="control-header">
+            <label for="slider-cycle-speed">Cycle Speed</label>
+            <span class="value-display" id="val-cycle-speed">1.0x</span>
+          </div>
+          <input type="range" id="slider-cycle-speed" min="0.1" max="10.0" step="0.1" value="1.0"
+            class="custom-slider" />
+        </div>
+
+        <div class="day-night-info">
+          <div class="dn-info-row">
+            <span class="dn-label">Sun Altitude</span>
+            <span class="dn-val" id="dn-sun-alt">45°</span>
+          </div>
+          <div class="dn-info-row">
+            <span class="dn-label">Phase</span>
+            <span class="dn-val text-cyan" id="dn-phase">Daytime</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Environment Controls -->
+      <section class="section-group">
+        <h3>Lighting Override</h3>
+
+        <div class="control-group">
+          <div class="control-header">
+            <label for="slider-sun-intensity">Sun Intensity</label>
+            <span class="value-display" id="val-sun-intensity">2.5x</span>
+          </div>
+          <input type="range" id="slider-sun-intensity" min="0.0" max="6.0" step="0.1" value="2.5"
+            class="custom-slider" />
+        </div>
+
+        <div class="control-group">
+          <div class="control-header">
+            <label for="slider-sun-temp">Sun Color Temp</label>
+            <span class="value-display" id="val-sun-temp">5500K</span>
+          </div>
+          <input type="range" id="slider-sun-temp" min="2000" max="10000" step="100" value="5500"
+            class="custom-slider" />
+        </div>
+
+        <div class="control-group">
+          <div class="control-header">
+            <label for="slider-sky-intensity">Hemisphere Skylight</label>
+            <span class="value-display" id="val-sky-intensity">1.0x</span>
+          </div>
+          <input type="range" id="slider-sky-intensity" min="0.0" max="3.0" step="0.1" value="1.0"
+            class="custom-slider" />
+        </div>
+      </section>
+
+      <!-- Model Details Card -->
+      <section class="section-group">
+        <h3>Details Inspector</h3>
+        <div id="model-details-card" class="details-card">
+          <p class="details-placeholder" id="details-placeholder">No custom model loaded.</p>
+          <div id="details-content" class="details-content hidden">
+            <div class="detail-row">
+              <span class="detail-lbl">Asset Name</span>
+              <span class="detail-val text-cyan" id="detail-name">-</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-lbl">Triangles</span>
+              <span class="detail-val" id="detail-tris">-</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-lbl">Vertices</span>
+              <span class="detail-val" id="detail-verts">-</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-lbl">File Size</span>
+              <span class="detail-val" id="detail-size">-</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-lbl">Bound Scale</span>
+              <span class="detail-val" id="detail-scale">-</span>
+            </div>
+            <button id="btn-clear-model" class="btn-secondary">Clear Custom Asset</button>
+          </div>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- Right HUD Panel: Performance & Hardware Info -->
+    <div class="hud-panel glass-panel">
+      <div class="stat-item">
+        <span class="stat-label">FPS</span>
+        <span class="stat-val text-green" id="fps-counter">60</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">API</span>
+        <span class="stat-val text-cyan" id="hud-api">WebGPU</span>
+      </div>
+      <div class="stat-item max-width-gpu">
+        <span class="stat-label">Active GPU Device</span>
+        <span class="stat-val text-purple text-truncate" id="hud-gpu">Detecting...</span>
+      </div>
+      <button id="btn-reset-view" class="hud-action-btn">
+        Focus Camera
+      </button>
+    </div>
+
+  </div>
+</body>
+
+</html>
